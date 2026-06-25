@@ -35,6 +35,7 @@ async function runGameLoop(sessionId: string, isRealtime: boolean): Promise<void
   const render = (frame: string) => {
     cursorHome()
     process.stdout.write(frame)
+    process.stdout.write('\x1b[J')
   }
 
   let pollTimer: ReturnType<typeof setInterval> | null = null
