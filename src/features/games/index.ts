@@ -28,23 +28,21 @@ export async function runGames(): Promise<void> {
 
   let selected = 0
   const TOTAL = games.length + 1 // +1 for 回上層
+  const PAGE = 5
 
   const render = () => {
     clearScreen()
     process.stdout.write(chalk.bold('遊戲\n\n'))
-    games.forEach((game, i) => {
-      if (i === selected) {
-        process.stdout.write(chalk.cyan(`  ▶ ${game.title}\n`))
-      } else {
-        process.stdout.write(`    ${game.title}\n`)
-      }
-    })
-    process.stdout.write(`    ──────────\n`)
-    if (selected === games.length) {
-      process.stdout.write(chalk.cyan(`  ▶ 回上層\n`))
-    } else {
-      process.stdout.write(`    回上層\n`)
+
+    const viewStart = Math.max(0, Math.min(selected - Math.floor(PAGE / 2), games.length - PAGE))
+    const viewEnd = Math.min(games.length, viewStart + PAGE)
+
+    for (let i = viewStart; i < viewEnd; i++) {
+      process.stdout.write(i === selected ? chalk.cyan(`  ▶ ${games[i].title}\n`) : `    ${games[i].title}\n`)
     }
+
+    process.stdout.write(`    ──────────\n`)
+    process.stdout.write(selected === games.length ? chalk.cyan(`  ▶ 回上層\n`) : `    回上層\n`)
     process.stdout.write(chalk.dim('\n↑↓ 移動  Enter 選擇  q 回上層\n'))
   }
 

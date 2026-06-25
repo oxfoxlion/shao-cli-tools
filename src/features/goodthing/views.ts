@@ -30,20 +30,36 @@ export async function showProfile(data: ProfileResponse): Promise<void> {
 
   process.stdout.write(`本月已記錄：${profile.month_entries.length} 筆\n\n`)
 
-  if (profile.recent_entries.length === 0) {
-    process.stdout.write(chalk.dim('尚無紀錄\n'))
-  } else {
-    process.stdout.write('最近 10 筆：\n')
-    profile.recent_entries.forEach((entry) => {
-      process.stdout.write(`${formatEntry(entry)}\n`)
-    })
+  const entries = profile.recent_entries
+  const PAGE = 5
+  let offset = 0
+
+  const render = () => {
+    clearScreen()
+    hideCursor()
+    process.stdout.write(chalk.bold('我的小小好事\n\n'))
+    process.stdout.write(`🔥 連續 ${s.current_streak} 天  ｜  最長 ${s.longest_streak} 天  ｜  ${nextBadge}\n`)
+    process.stdout.write(`徽章：${badgeStr}\n\n`)
+    process.stdout.write(`本月已記錄：${profile.month_entries.length} 筆\n\n`)
+
+    if (entries.length === 0) {
+      process.stdout.write(chalk.dim('尚無紀錄\n'))
+    } else {
+      process.stdout.write(`最近紀錄：\n`)
+      entries.slice(offset, offset + PAGE).forEach((entry) => {
+        process.stdout.write(`${formatEntry(entry)}\n`)
+      })
+    }
+    process.stdout.write(chalk.dim('\nj/k 滾動  q 回選單\n'))
   }
 
-  process.stdout.write(chalk.dim('\nq 回選單\n'))
+  render()
 
   while (true) {
     const key = await waitForKey()
     if (key === 'q' || key === 'enter' || key === 'ctrl+c') break
+    if ((key === 'down' || key === 'j') && offset + PAGE < entries.length) { offset++; render() }
+    if ((key === 'up' || key === 'k') && offset > 0) { offset--; render() }
   }
 }
 
