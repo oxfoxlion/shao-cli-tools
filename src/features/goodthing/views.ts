@@ -100,28 +100,22 @@ async function readLine(prompt: string, defaultValue?: string): Promise<string |
   if (defaultValue) process.stdout.write(chalk.dim(`（預設：${defaultValue}）`))
   process.stdout.write(' ')
 
-  process.stdin.setRawMode(false)
-  process.stdin.resume()
-  process.stdin.setEncoding('utf8')
-
   return new Promise((resolve) => {
     let buf = ''
     const onData = (data: string) => {
       if (data === '\r' || data === '\n') {
         process.stdin.off('data', onData)
-        process.stdin.setRawMode(true)
         process.stdout.write('\n')
         resolve(buf.trim() || defaultValue || '')
       } else if (data === '\x03') {
         process.stdin.off('data', onData)
-        process.stdin.setRawMode(true)
         resolve(null)
       } else if (data === '\x7f' || data === '\x08') {
         if (buf.length > 0) {
           buf = buf.slice(0, -1)
           process.stdout.write('\b \b')
         }
-      } else {
+      } else if (data >= ' ') {
         buf += data
         process.stdout.write(data)
       }
@@ -165,7 +159,6 @@ export async function showAddEntry(): Promise<NewEntryForm | null> {
   process.stdout.write('──────────\n')
   process.stdout.write(chalk.dim('Enter 確認送出  q 取消\n'))
 
-  process.stdin.setRawMode(true)
   const confirm = await waitForKey()
   if (confirm !== 'enter') return null
 
