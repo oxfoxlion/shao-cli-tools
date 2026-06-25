@@ -1,6 +1,6 @@
 {
   "name": "@oxfoxlion/shao-cli-tools",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "邵的個人終端機工具包",
   "type": "module",
   "main": "dist/index.js",
