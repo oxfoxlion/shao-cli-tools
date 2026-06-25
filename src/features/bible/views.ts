@@ -54,7 +54,7 @@ export async function showBooks(books: Book[]): Promise<Book | null> {
     return 0
   }
 
-  const ps = 12
+  const ps = 5
 
   const render = () => {
     clearScreen()
@@ -145,7 +145,7 @@ export async function showChapter(
       .map(a => a.verse)
   )
 
-  const CONTENT_LINES = 12
+  const CONTENT_LINES = 5
   const VERSE_PREFIX = 8  // "▶ NNN ✎ "
   const textWidth = Math.max(10, (process.stdout.columns ?? 80) - VERSE_PREFIX)
   const availLines = CONTENT_LINES
@@ -231,7 +231,7 @@ export async function showSearchResults(
     }
   }
 
-  const resultsPerPage = 4
+  const resultsPerPage = 2
   let offset = 0
 
   const render = () => {
@@ -421,7 +421,7 @@ export async function showAnnotationList(
 
   const total = annotations.length
   let selected = 0
-  const ps = 4
+  const ps = 2
 
   const render = () => {
     clearScreen()

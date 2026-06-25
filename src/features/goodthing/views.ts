@@ -55,7 +55,7 @@ export async function showPublicEntries(entries: Entry[]): Promise<void> {
   if (entries.length === 0) {
     process.stdout.write(chalk.dim('目前還沒有人分享好事\n'))
   } else {
-    const pageSize = 10
+    const pageSize = 5
     let offset = 0
 
     const render = () => {
