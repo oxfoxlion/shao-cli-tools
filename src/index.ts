@@ -5,10 +5,11 @@ import { waitForKey } from './lib/input.js'
 import { runGames } from './features/games/index.js'
 import { runGoodthing } from './features/goodthing/index.js'
 import { runBible } from './features/bible/index.js'
+import { runPrayer } from './features/prayer/index.js'
 
 const VERSION = '1.0'
 
-const MENU_ITEMS = ['遊戲', '小小好事', '聖經閱讀'] as const
+const MENU_ITEMS = ['遊戲', '小小好事', '聖經閱讀', '禱告日記'] as const
 const TOTAL = MENU_ITEMS.length + 1 // +1 for 離開
 
 function renderMenu(selected: number): void {
@@ -59,6 +60,10 @@ async function main(): Promise<void> {
       } else if (selected === 2) {
         showCursor()
         await runBible()
+        hideCursor()
+      } else if (selected === 3) {
+        showCursor()
+        await runPrayer()
         hideCursor()
       } else {
         break
