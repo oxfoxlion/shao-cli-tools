@@ -4,10 +4,11 @@ import { clearScreen, hideCursor, showCursor, enterAltScreen, exitAltScreen } fr
 import { waitForKey } from './lib/input.js'
 import { runGames } from './features/games/index.js'
 import { runGoodthing } from './features/goodthing/index.js'
+import { runBible } from './features/bible/index.js'
 
 const VERSION = '1.0'
 
-const MENU_ITEMS = ['遊戲', '小小好事'] as const
+const MENU_ITEMS = ['遊戲', '小小好事', '聖經閱讀'] as const
 const TOTAL = MENU_ITEMS.length + 1 // +1 for 離開
 
 function renderMenu(selected: number): void {
@@ -51,6 +52,10 @@ async function main(): Promise<void> {
       } else if (selected === 1) {
         showCursor()
         await runGoodthing()
+        hideCursor()
+      } else if (selected === 2) {
+        showCursor()
+        await runBible()
         hideCursor()
       } else {
         break
