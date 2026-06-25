@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import { clearScreen, hideCursor, showCursor } from '../../lib/screen.js'
+import { clearScreen, hideCursor, showCursor, registerRender } from '../../lib/screen.js'
 import { waitForKey } from '../../lib/input.js'
 import { fetchGames, type Game } from './client.js'
 import { playGame } from './player.js'
@@ -45,6 +45,7 @@ export async function runGames(): Promise<void> {
     process.stdout.write(selected === games.length ? chalk.cyan(`  ▶ 回上層\n`) : `    回上層\n`)
     process.stdout.write(chalk.dim('\n↑↓ 移動  Enter 選擇  q 回上層\n'))
   }
+  registerRender(render)
 
   while (true) {
     render()

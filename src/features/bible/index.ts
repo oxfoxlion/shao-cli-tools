@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import { clearScreen, hideCursor, showCursor } from '../../lib/screen.js'
+import { clearScreen, hideCursor, showCursor, registerRender } from '../../lib/screen.js'
 import { waitForKey } from '../../lib/input.js'
 import { AuthError, NetworkError } from '../../lib/api.js'
 import { fetchMe, login, register } from '../goodthing/client.js'
@@ -92,6 +92,7 @@ async function ensureAuth(): Promise<boolean> {
     })
     process.stdout.write(chalk.dim('\n↑↓ 移動  Enter 選擇\n'))
   }
+  registerRender(render)
 
   render()
 
@@ -505,6 +506,7 @@ export async function runBible(): Promise<void> {
     })
     process.stdout.write(chalk.dim('\n↑↓ 移動  Enter 選擇  q 返回\n'))
   }
+  registerRender(render)
 
   while (true) {
     render()

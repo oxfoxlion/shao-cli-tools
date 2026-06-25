@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import { clearScreen, hideCursor } from '../../lib/screen.js'
+import { clearScreen, hideCursor, registerRender } from '../../lib/screen.js'
 import { waitForKey } from '../../lib/input.js'
 import type { ProfileResponse, Entry } from './client.js'
 
@@ -52,6 +52,7 @@ export async function showProfile(data: ProfileResponse): Promise<void> {
     }
     process.stdout.write(chalk.dim('\nj/k 滾動  q 回選單\n'))
   }
+  registerRender(render)
 
   render()
 
@@ -83,6 +84,7 @@ export async function showPublicEntries(entries: Entry[]): Promise<void> {
       const hasMore = offset + pageSize < entries.length
       process.stdout.write(chalk.dim(`\nj/k 滾動  q 回選單${hasMore ? '  (更多)' : ''}\n`))
     }
+    registerRender(render)
 
     render()
 

@@ -21,3 +21,13 @@ export const enterAltScreen = (): void => {
 export const exitAltScreen = (): void => {
   process.stdout.write('\x1b[?1049l')
 }
+
+let activeRender: (() => void) | null = null
+
+export function registerRender(fn: () => void): void {
+  activeRender = fn
+}
+
+process.stdout.on('resize', () => {
+  activeRender?.()
+})

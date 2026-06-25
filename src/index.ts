@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import chalk from 'chalk'
-import { clearScreen, hideCursor, showCursor, enterAltScreen, exitAltScreen } from './lib/screen.js'
+import { clearScreen, hideCursor, showCursor, enterAltScreen, exitAltScreen, registerRender } from './lib/screen.js'
 import { waitForKey } from './lib/input.js'
 import { runGames } from './features/games/index.js'
 import { runGoodthing } from './features/goodthing/index.js'
@@ -35,6 +35,7 @@ async function main(): Promise<void> {
   enterAltScreen()
   hideCursor()
   let selected = 0
+  registerRender(() => renderMenu(selected))
 
   while (true) {
     renderMenu(selected)
