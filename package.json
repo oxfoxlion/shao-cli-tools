@@ -1,0 +1,43 @@
+{
+  "name": "@oxfoxlion/shao-cli-tools",
+  "version": "1.0.0",
+  "description": "邵的個人終端機工具包",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "shao-cli-tools": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "prepare": "npm run build",
+    "release:patch": "npm version patch && npm publish --access public && git push && git push --tags",
+    "release:minor": "npm version minor && npm publish --access public && git push && git push --tags",
+    "release:major": "npm version major && npm publish --access public && git push && git push --tags",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "files": [
+    "dist/"
+  ],
+  "homepage": "https://github.com/oxfoxlion/shao-cli-tools#readme",
+  "bugs": {
+    "url": "https://github.com/oxfoxlion/shao-cli-tools/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oxfoxlion/shao-cli-tools.git"
+  },
+  "license": "ISC",
+  "author": "oxfoxlion",
+  "dependencies": {
+    "chalk": "^5.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}
