@@ -9,62 +9,59 @@ import {
 } from './client.js'
 import { showProfile, showPublicEntries, showAddEntry } from './views.js'
 
+function readLineRaw(prompt: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    process.stdout.write(prompt)
+    let buf = ''
+    const onData = (data: string) => {
+      if (data === '\r' || data === '\n') {
+        process.stdin.off('data', onData)
+        process.stdout.write('\n')
+        resolve(buf.trim())
+      } else if (data === '\x03') {
+        process.stdin.off('data', onData)
+        resolve(null)
+      } else if (data === '\x7f' || data === '\x08') {
+        if (buf.length > 0) { buf = buf.slice(0, -1); process.stdout.write('\b \b') }
+      } else if (data >= ' ') {
+        buf += data
+        process.stdout.write(data)
+      }
+    }
+    process.stdin.on('data', onData)
+  })
+}
+
+function readPinRaw(prompt: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    process.stdout.write(prompt)
+    let buf = ''
+    const onData = (data: string) => {
+      if (data === '\r' || data === '\n') {
+        process.stdin.off('data', onData)
+        process.stdout.write('\n')
+        resolve(buf)
+      } else if (data === '\x03') {
+        process.stdin.off('data', onData)
+        resolve(null)
+      } else if (data === '\x7f' || data === '\x08') {
+        if (buf.length > 0) { buf = buf.slice(0, -1); process.stdout.write('\b \b') }
+      } else if (/^\d$/.test(data) && buf.length < 6) {
+        buf += data
+        process.stdout.write('*')
+      }
+    }
+    process.stdin.on('data', onData)
+  })
+}
+
 async function readCredentials(): Promise<{ nickname: string; pin: string } | null> {
   process.stdout.write(chalk.dim('每個步驟按 Ctrl+C 取消\n\n'))
 
-  process.stdin.setRawMode(false)
-  process.stdin.resume()
-  process.stdin.setEncoding('utf8')
+  const nickname = await readLineRaw('暱稱：')
+  if (nickname === null) return null
 
-  const readLine = (prompt: string): Promise<string | null> =>
-    new Promise((resolve) => {
-      process.stdout.write(prompt)
-      let buf = ''
-      const onData = (data: string) => {
-        if (data === '\r' || data === '\n') {
-          process.stdin.off('data', onData)
-          process.stdout.write('\n')
-          resolve(buf.trim())
-        } else if (data === '\x03') {
-          process.stdin.off('data', onData)
-          resolve(null)
-        } else if (data === '\x7f' || data === '\x08') {
-          if (buf.length > 0) { buf = buf.slice(0, -1); process.stdout.write('\b \b') }
-        } else {
-          buf += data
-          process.stdout.write(data)
-        }
-      }
-      process.stdin.on('data', onData)
-    })
-
-  const readPin = (prompt: string): Promise<string | null> =>
-    new Promise((resolve) => {
-      process.stdout.write(prompt)
-      let buf = ''
-      const onData = (data: string) => {
-        if (data === '\r' || data === '\n') {
-          process.stdin.off('data', onData)
-          process.stdout.write('\n')
-          resolve(buf.trim())
-        } else if (data === '\x03') {
-          process.stdin.off('data', onData)
-          resolve(null)
-        } else if (data === '\x7f' || data === '\x08') {
-          if (buf.length > 0) { buf = buf.slice(0, -1); process.stdout.write('\b \b') }
-        } else if (/^\d$/.test(data) && buf.length < 6) {
-          buf += data
-          process.stdout.write('*')
-        }
-      }
-      process.stdin.on('data', onData)
-    })
-
-  const nickname = await readLine('暱稱：')
-  if (nickname === null) { process.stdin.setRawMode(true); return null }
-
-  const pin = await readPin('6 位 PIN：')
-  process.stdin.setRawMode(true)
+  const pin = await readPinRaw('6 位 PIN：')
   if (pin === null) return null
 
   return { nickname, pin }
