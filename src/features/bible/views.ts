@@ -54,7 +54,7 @@ export async function showBooks(books: Book[]): Promise<Book | null> {
     return 0
   }
 
-  const ps = Math.max(5, (process.stdout.rows ?? 24) - 6)
+  const ps = 12
 
   const render = () => {
     clearScreen()
@@ -144,7 +144,28 @@ export async function showChapter(
       .filter(a => a.book_id === chapter.book_id && a.chapter === chapter.chapter)
       .map(a => a.verse)
   )
-  const ps = Math.max(3, (process.stdout.rows ?? 24) - 5)
+
+  const CONTENT_LINES = 12
+  const VERSE_PREFIX = 8  // "▶ NNN ✎ "
+  const textWidth = Math.max(10, (process.stdout.columns ?? 80) - VERSE_PREFIX)
+  const availLines = CONTENT_LINES
+
+  function verseLineCount(text: string): number {
+    return Math.max(1, Math.ceil(text.length / textWidth))
+  }
+
+  function calcViewEnd(startOffset: number): number {
+    let lines = 0
+    let i = startOffset
+    while (i < verses.length) {
+      const vl = verseLineCount(verses[i].text)
+      if (lines + vl > availLines) break
+      lines += vl
+      i++
+    }
+    return Math.max(startOffset + 1, i)
+  }
+
   let cursor = 0
   let offset = 0
 
@@ -153,8 +174,11 @@ export async function showChapter(
     hideCursor()
     process.stdout.write(chalk.bold(`${chapter.book_name} 第 ${chapter.chapter} 章\n\n`))
 
-    for (let i = offset; i < Math.min(offset + ps, verses.length); i++) {
+    let linesLeft = availLines
+    for (let i = offset; i < verses.length && linesLeft > 0; i++) {
       const v = verses[i]
+      const vl = verseLineCount(v.text)
+      if (linesLeft < vl && i > offset) break
       const isSelected = i === cursor
       const numStr = String(v.verse).padStart(3)
       const annMark = annotatedVerses.has(v.verse) ? chalk.yellow('✎') : ' '
@@ -163,6 +187,7 @@ export async function showChapter(
       } else {
         process.stdout.write(` ${chalk.dim(numStr)} ${annMark} ${v.text}\n`)
       }
+      linesLeft -= vl
     }
 
     const completeHint = options.showComplete ? '  c 標記今日完成' : ''
@@ -183,7 +208,7 @@ export async function showChapter(
     }
     if ((key === 'down' || key === 'j') && cursor < verses.length - 1) {
       cursor++
-      if (cursor >= offset + ps) offset = cursor - ps + 1
+      while (cursor >= calcViewEnd(offset)) offset++
       render()
     }
   }
@@ -206,7 +231,7 @@ export async function showSearchResults(
     }
   }
 
-  const resultsPerPage = Math.max(1, Math.floor(((process.stdout.rows ?? 24) - 6) / 3))
+  const resultsPerPage = 4
   let offset = 0
 
   const render = () => {
@@ -215,9 +240,11 @@ export async function showSearchResults(
     const shown = verses.length < count ? `顯示前 ${verses.length} 筆，共 ${count} 筆` : `共 ${count} 筆`
     process.stdout.write(chalk.bold(`搜尋「${keyword}」— ${shown}\n\n`))
 
+    const maxText = Math.max(10, (process.stdout.columns ?? 80) - 4)
     for (const v of verses.slice(offset, offset + resultsPerPage)) {
       process.stdout.write(`  ${chalk.cyan(`${v.book_name} ${v.chapter}:${v.verse}`)}\n`)
-      process.stdout.write(`  ${v.text}\n\n`)
+      const text = v.text.length > maxText ? v.text.slice(0, maxText - 1) + '…' : v.text
+      process.stdout.write(`  ${text}\n\n`)
     }
 
     process.stdout.write(chalk.dim(`j/k 滾動  q 返回\n`))
@@ -394,8 +421,7 @@ export async function showAnnotationList(
 
   const total = annotations.length
   let selected = 0
-  const itemHeight = 3
-  const ps = Math.max(1, Math.floor(((process.stdout.rows ?? 24) - 6) / itemHeight))
+  const ps = 4
 
   const render = () => {
     clearScreen()

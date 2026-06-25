@@ -6,7 +6,12 @@ import type { ProfileResponse, Entry } from './client.js'
 const STAR = '★'
 
 function formatEntry(entry: Entry): string {
-  return `  ${entry.date}  ${STAR}${entry.mood_temperature}  ${entry.nickname}：${entry.content}`
+  const prefix = `  ${entry.date}  ${STAR}${entry.mood_temperature}  ${entry.nickname}：`
+  const maxContent = Math.max(10, (process.stdout.columns ?? 80) - prefix.length - 1)
+  const content = entry.content.length > maxContent
+    ? entry.content.slice(0, maxContent - 1) + '…'
+    : entry.content
+  return prefix + content
 }
 
 export async function showProfile(data: ProfileResponse): Promise<void> {
@@ -50,7 +55,7 @@ export async function showPublicEntries(entries: Entry[]): Promise<void> {
   if (entries.length === 0) {
     process.stdout.write(chalk.dim('目前還沒有人分享好事\n'))
   } else {
-    const pageSize = Math.max(1, process.stdout.rows - 6)
+    const pageSize = 10
     let offset = 0
 
     const render = () => {
