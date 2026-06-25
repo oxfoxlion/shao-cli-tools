@@ -28,6 +28,8 @@ async function main(): Promise<void> {
   process.on('exit', () => {
     showCursor()
     exitAltScreen()
+    if (process.stdin.isTTY) process.stdin.setRawMode(false)
+    process.stdin.pause()
   })
 
   enterAltScreen()
@@ -65,11 +67,15 @@ async function main(): Promise<void> {
 
   showCursor()
   exitAltScreen()
+  if (process.stdin.isTTY) process.stdin.setRawMode(false)
+  process.stdin.pause()
 }
 
 main().catch((err: unknown) => {
   showCursor()
   exitAltScreen()
+  if (process.stdin.isTTY) process.stdin.setRawMode(false)
+  process.stdin.pause()
   console.error(err)
   process.exit(1)
 })

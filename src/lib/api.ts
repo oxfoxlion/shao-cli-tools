@@ -38,7 +38,11 @@ async function apiFetch<T>(method: string, path: string, body?: unknown): Promis
   }
 
   if (response.status === 401) throw new AuthError()
-  if (!response.ok) throw new NetworkError(`伺服器錯誤：${response.status}`)
+  if (!response.ok) {
+    let body = ''
+    try { body = await response.text() } catch { /* ignore */ }
+    throw new NetworkError(`伺服器錯誤：${response.status}${body ? `\n${body}` : ''}`)
+  }
 
   return response.json() as Promise<T>
 }
