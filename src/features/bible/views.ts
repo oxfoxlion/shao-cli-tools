@@ -135,8 +135,9 @@ export async function showChapterSelect(book: Book): Promise<number | null> {
 
 export async function showChapter(
   chapter: BibleChapter,
-  annotations: Annotation[]
-): Promise<{ type: 'annotate'; verse: number } | null> {
+  annotations: Annotation[],
+  options: { showComplete?: boolean } = {}
+): Promise<{ type: 'annotate'; verse: number } | { type: 'complete' } | null> {
   const verses = chapter.verses
   const annotatedVerses = new Set(
     annotations
@@ -164,7 +165,8 @@ export async function showChapter(
       }
     }
 
-    process.stdout.write(chalk.dim(`\nj/k 移動  a 新增註記  q 返回  (${cursor + 1}/${verses.length})\n`))
+    const completeHint = options.showComplete ? '  c 標記今日完成' : ''
+    process.stdout.write(chalk.dim(`\nj/k 移動  a 新增註記${completeHint}  q 返回  (${cursor + 1}/${verses.length})\n`))
   }
 
   render()
@@ -173,6 +175,7 @@ export async function showChapter(
     const key = await waitForKey()
     if (key === 'q' || key === 'ctrl+c' || key === 'escape') return null
     if (key === 'a') return { type: 'annotate', verse: verses[cursor].verse }
+    if (key === 'c' && options.showComplete) return { type: 'complete' }
     if ((key === 'up' || key === 'k') && cursor > 0) {
       cursor--
       if (cursor < offset) offset = cursor
@@ -304,10 +307,20 @@ export async function showUserPlanMenu(userPlans: UserPlan[]): Promise<UserPlanM
   }
 }
 
-export async function showTodayReading(data: TodayReadingResponse): Promise<'complete' | 'back'> {
+export type TodayReadingResult =
+  | { type: 'read'; bookId: string; chapter: number }
+  | { type: 'complete' }
+  | { type: 'back' }
+
+export async function showTodayReading(data: TodayReadingResponse): Promise<TodayReadingResult> {
   const { current_day, total_days, reading, completed_days } = data
   const isCompleted = completed_days.includes(current_day)
   const isFinished = current_day > total_days
+
+  const passages = reading.passages
+  const hasCompleteItem = !isCompleted && !isFinished
+  const total = passages.length + (hasCompleteItem ? 1 : 0)
+  let selected = 0
 
   const render = () => {
     clearScreen()
@@ -321,27 +334,45 @@ export async function showTodayReading(data: TodayReadingResponse): Promise<'com
     }
 
     process.stdout.write(`今日閱讀：\n`)
-    reading.passages.forEach((p) => {
-      process.stdout.write(`  ${p.book_name} 第 ${p.chapter} 章\n`)
+    passages.forEach((p, i) => {
+      const label = `${p.book_name} 第 ${p.chapter} 章`
+      process.stdout.write(
+        i === selected
+          ? chalk.cyan(`  ▶ ${label}\n`)
+          : `    ${label}\n`
+      )
     })
+
+    if (hasCompleteItem) {
+      process.stdout.write(`    ──────────\n`)
+      process.stdout.write(
+        passages.length === selected
+          ? chalk.cyan(`  ▶ ✓ 標記今日完成\n`)
+          : `    ✓ 標記今日完成\n`
+      )
+    } else if (isCompleted) {
+      process.stdout.write(chalk.green('\n✓ 今日已完成\n'))
+    }
 
     const pct = Math.floor((completed_days.length / total_days) * 100)
     process.stdout.write(`\n已完成：${completed_days.length}/${total_days} 天 (${pct}%)\n`)
-
-    if (isCompleted) {
-      process.stdout.write(chalk.green('\n✓ 今日已完成\n'))
-    } else if (!isFinished) {
-      process.stdout.write(chalk.dim('\nEnter 標記今日完成\n'))
-    }
-    process.stdout.write(chalk.dim('\nq 返回\n'))
+    process.stdout.write(chalk.dim('\nj/k 移動  Enter 閱讀/確認  q 返回\n'))
   }
 
   render()
 
   while (true) {
     const key = await waitForKey()
-    if (key === 'q' || key === 'ctrl+c' || key === 'escape') return 'back'
-    if (key === 'enter' && !isCompleted && !isFinished) return 'complete'
+    if (key === 'q' || key === 'ctrl+c' || key === 'escape') return { type: 'back' }
+    if ((key === 'up' || key === 'k') && selected > 0) { selected--; render() }
+    if ((key === 'down' || key === 'j') && selected < total - 1) { selected++; render() }
+    if (key === 'enter') {
+      if (selected < passages.length) {
+        const p = passages[selected]
+        return { type: 'read', bookId: p.book_id, chapter: p.chapter }
+      }
+      return { type: 'complete' }
+    }
   }
 }
 

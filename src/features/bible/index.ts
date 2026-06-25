@@ -14,6 +14,7 @@ import {
   readLine, showBooks, showChapterSelect, showChapter,
   showSearchResults, showPlanSelect, showUserPlanMenu,
   showTodayReading, showAnnotationList,
+  type TodayReadingResult,
 } from './views.js'
 
 function readLineRaw(prompt: string): Promise<string | null> {
@@ -194,8 +195,8 @@ async function runBrowse(): Promise<void> {
     while (true) {
       const action = await showChapter(chapterData, annotations)
       if (!action) break
+      if (action.type !== 'annotate') continue
 
-      // User pressed 'a' to annotate the selected verse
       clearScreen()
       showCursor()
       process.stdout.write(chalk.bold(`新增節次註記 — ${chapterData.book_name} ${chapterNum}:${action.verse}\n\n`))
@@ -267,6 +268,23 @@ async function runSearch(): Promise<void> {
   }
 }
 
+async function doMarkComplete(planId: string, day: number): Promise<void> {
+  clearScreen()
+  process.stdout.write(chalk.dim('記錄完成...\n'))
+  try {
+    const res = await markDayComplete(planId, day)
+    if (res.already_completed) {
+      process.stdout.write(chalk.yellow('今日已記錄過完成\n'))
+    } else {
+      process.stdout.write(chalk.green(`✓ 第 ${day} 天完成！\n`))
+    }
+  } catch (err) {
+    process.stdout.write(chalk.red(`\n錯誤：${err instanceof NetworkError ? err.message : '記錄失敗'}\n`))
+  }
+  process.stdout.write(chalk.dim('按任意鍵返回...\n'))
+  await waitForKey()
+}
+
 async function runPlans(): Promise<void> {
   if (!await ensureAuth()) return
 
@@ -329,39 +347,104 @@ async function runPlans(): Promise<void> {
       }
     } else {
       const up = action.plan
+      let needsFetch = true
+      let todayData: Awaited<ReturnType<typeof fetchTodayReading>> | undefined
 
-      while (true) {
-        clearScreen()
-        process.stdout.write(chalk.dim('載入今日進度...\n'))
-
-        let todayData
-        try {
-          todayData = await fetchTodayReading(up.id)
-        } catch (err) {
-          process.stdout.write(chalk.red(`\n錯誤：${err instanceof NetworkError ? err.message : '載入失敗'}\n`))
-          process.stdout.write(chalk.dim('按任意鍵返回...\n'))
-          await waitForKey()
-          break
+      planLoop: while (true) {
+        if (needsFetch) {
+          clearScreen()
+          process.stdout.write(chalk.dim('載入今日進度...\n'))
+          try {
+            todayData = await fetchTodayReading(up.id)
+            needsFetch = false
+          } catch (err) {
+            process.stdout.write(chalk.red(`\n錯誤：${err instanceof NetworkError ? err.message : '載入失敗'}\n`))
+            process.stdout.write(chalk.dim('按任意鍵返回...\n'))
+            await waitForKey()
+            break
+          }
         }
 
-        const result = await showTodayReading(todayData)
-        if (result === 'back') break
+        const result: TodayReadingResult = await showTodayReading(todayData!)
 
+        if (result.type === 'back') break
+
+        if (result.type === 'complete') {
+          await doMarkComplete(up.id, todayData!.current_day)
+          needsFetch = true
+          continue
+        }
+
+        // result.type === 'read' — 跳到對應章節閱讀
         clearScreen()
-        process.stdout.write(chalk.dim('記錄完成...\n'))
+        process.stdout.write(chalk.dim('載入章節...\n'))
+
+        let chapterData
         try {
-          const res = await markDayComplete(up.id, todayData.current_day)
-          if (res.already_completed) {
-            process.stdout.write(chalk.yellow('今日已記錄過完成\n'))
-          } else {
-            process.stdout.write(chalk.green(`✓ 第 ${todayData.current_day} 天完成！\n`))
-          }
-          process.stdout.write(chalk.dim('按任意鍵返回...\n'))
-          await waitForKey()
+          const res = await fetchChapter(result.bookId, result.chapter)
+          chapterData = res.chapter
         } catch (err) {
-          process.stdout.write(chalk.red(`\n錯誤：${err instanceof NetworkError ? err.message : '記錄失敗'}\n`))
+          process.stdout.write(chalk.red(`\n錯誤：${err instanceof NetworkError ? err.message : '無法載入章節'}\n`))
           process.stdout.write(chalk.dim('按任意鍵返回...\n'))
           await waitForKey()
+          continue planLoop
+        }
+
+        let chAnnotations: Annotation[] = []
+        try {
+          const res = await fetchAnnotations(result.bookId, result.chapter)
+          chAnnotations = res.annotations
+        } catch { /* best effort */ }
+
+        const canComplete = !todayData!.completed_days.includes(todayData!.current_day)
+          && todayData!.current_day <= todayData!.total_days
+
+        // 章節閱讀迴圈
+        while (true) {
+          const chAction = await showChapter(chapterData, chAnnotations, { showComplete: canComplete })
+
+          if (!chAction) break // 返回今日讀經
+
+          if (chAction.type === 'complete') {
+            await doMarkComplete(up.id, todayData!.current_day)
+            needsFetch = true
+            break
+          }
+
+          // chAction.type === 'annotate'
+          clearScreen()
+          showCursor()
+          process.stdout.write(chalk.bold(`新增節次註記 — ${chapterData.book_name} ${result.chapter}:${chAction.verse}\n\n`))
+          const note = await readLine('內容 (最多 1000 字)：')
+          hideCursor()
+
+          if (!note || note.trim() === '') continue
+          if (note.length > 1000) {
+            clearScreen()
+            process.stdout.write(chalk.red('內容不能超過 1000 字\n'))
+            process.stdout.write(chalk.dim('按任意鍵返回...\n'))
+            await waitForKey()
+            continue
+          }
+
+          clearScreen()
+          process.stdout.write(chalk.dim('儲存中...\n'))
+          try {
+            await createAnnotation({ book_id: result.bookId, chapter: result.chapter, verse: chAction.verse, note: note.trim() })
+            const res = await fetchAnnotations(result.bookId, result.chapter)
+            chAnnotations = res.annotations
+            process.stdout.write(chalk.green('✓ 註記已儲存\n'))
+            process.stdout.write(chalk.dim('按任意鍵返回...\n'))
+            await waitForKey()
+          } catch (err) {
+            if (err instanceof AuthError) {
+              process.stdout.write(chalk.yellow('請先登入才能新增註記\n'))
+            } else {
+              process.stdout.write(chalk.red(`\n錯誤：${err instanceof NetworkError ? err.message : '無法儲存'}\n`))
+            }
+            process.stdout.write(chalk.dim('按任意鍵返回...\n'))
+            await waitForKey()
+          }
         }
       }
     }
