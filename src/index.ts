@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import chalk from 'chalk'
-import { clearScreen, hideCursor, showCursor } from './lib/screen.js'
+import { clearScreen, hideCursor, showCursor, enterAltScreen, exitAltScreen } from './lib/screen.js'
 import { waitForKey } from './lib/input.js'
 import { runGames } from './features/games/index.js'
 import { runGoodthing } from './features/goodthing/index.js'
@@ -24,8 +24,12 @@ function renderMenu(selected: number): void {
 }
 
 async function main(): Promise<void> {
-  process.on('exit', () => showCursor())
+  process.on('exit', () => {
+    showCursor()
+    exitAltScreen()
+  })
 
+  enterAltScreen()
   hideCursor()
   let selected = 0
 
@@ -55,11 +59,12 @@ async function main(): Promise<void> {
   }
 
   showCursor()
-  clearScreen()
+  exitAltScreen()
 }
 
 main().catch((err: unknown) => {
   showCursor()
+  exitAltScreen()
   console.error(err)
   process.exit(1)
 })

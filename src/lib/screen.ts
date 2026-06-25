@@ -13,3 +13,11 @@ export const hideCursor = (): void => {
 export const showCursor = (): void => {
   process.stdout.write('\x1b[?25h')
 }
+
+export const enterAltScreen = (): void => {
+  process.stdout.write('\x1b[?1049h')
+}
+
+export const exitAltScreen = (): void => {
+  process.stdout.write('\x1b[?1049l')
+}
