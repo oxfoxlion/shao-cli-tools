@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import { clearScreen, hideCursor } from '../../lib/screen.js'
+import { clearScreen, hideCursor, registerRender } from '../../lib/screen.js'
 import { waitForKey } from '../../lib/input.js'
 import type { Book, BibleChapter, Annotation, Plan, UserPlan, SearchVerseResult, TodayReadingResponse } from './client.js'
 
@@ -88,6 +88,7 @@ export async function showBooks(books: Book[]): Promise<Book | null> {
 
     process.stdout.write(chalk.dim(`\nj/k ↑↓ 移動  Enter 選擇  q 返回  (${selected + 1}/${totalBooks})\n`))
   }
+  registerRender(render)
 
   render()
 
@@ -119,6 +120,7 @@ export async function showChapterSelect(book: Book): Promise<number | null> {
 
     process.stdout.write(chalk.dim('\n← → ↑↓ 移動  Enter 選擇  q 返回\n'))
   }
+  registerRender(render)
 
   render()
 
@@ -193,6 +195,7 @@ export async function showChapter(
     const completeHint = options.showComplete ? '  c 標記今日完成' : ''
     process.stdout.write(chalk.dim(`\nj/k 移動  a 新增註記${completeHint}  q 返回  (${cursor + 1}/${verses.length})\n`))
   }
+  registerRender(render)
 
   render()
 
@@ -249,6 +252,7 @@ export async function showSearchResults(
 
     process.stdout.write(chalk.dim(`j/k 滾動  q 返回\n`))
   }
+  registerRender(render)
 
   render()
 
@@ -277,6 +281,7 @@ export async function showPlanSelect(plans: Plan[]): Promise<Plan | null> {
     })
     process.stdout.write(chalk.dim('↑↓ 移動  Enter 確認  q 返回\n'))
   }
+  registerRender(render)
 
   render()
 
@@ -319,6 +324,7 @@ export async function showUserPlanMenu(userPlans: UserPlan[]): Promise<UserPlanM
 
     process.stdout.write(chalk.dim('\n↑↓ 移動  Enter 選擇  q 返回\n'))
   }
+  registerRender(render)
 
   render()
 
@@ -385,6 +391,7 @@ export async function showTodayReading(data: TodayReadingResponse): Promise<Toda
     process.stdout.write(`\n已完成：${completed_days.length}/${total_days} 天 (${pct}%)\n`)
     process.stdout.write(chalk.dim('\nj/k 移動  Enter 閱讀/確認  q 返回\n'))
   }
+  registerRender(render)
 
   render()
 
@@ -444,6 +451,7 @@ export async function showAnnotationList(
 
     process.stdout.write(chalk.dim('↑↓ 移動  d 刪除  q 返回\n'))
   }
+  registerRender(render)
 
   render()
 
