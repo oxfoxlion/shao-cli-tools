@@ -13,9 +13,10 @@ import {
 import {
   readLine, showBooks, showChapterSelect, showChapter,
   showSearchResults, showPlanSelect, showUserPlanMenu,
-  showTodayReading, showAnnotationList,
+  showTodayReading, showAnnotationList, showVersionSelect,
   type TodayReadingResult,
 } from './views.js'
+import type { BibleVersion } from './client.js'
 
 function readLineRaw(prompt: string): Promise<string | null> {
   return new Promise((resolve) => {
@@ -149,13 +150,13 @@ async function ensureAuth(): Promise<boolean> {
   }
 }
 
-async function runBrowse(): Promise<void> {
+async function runBrowse(version: BibleVersion): Promise<void> {
   clearScreen()
   process.stdout.write(chalk.dim('載入書卷列表...\n'))
 
   let books
   try {
-    const res = await fetchBooks()
+    const res = await fetchBooks(version)
     books = res.books
   } catch (err) {
     process.stdout.write(chalk.red(`\n錯誤：${err instanceof NetworkError ? err.message : '無法載入書卷'}\n`))
@@ -176,7 +177,7 @@ async function runBrowse(): Promise<void> {
 
     let chapterData
     try {
-      const res = await fetchChapter(book.id, chapterNum)
+      const res = await fetchChapter(book.id, chapterNum, version)
       chapterData = res.chapter
     } catch (err) {
       process.stdout.write(chalk.red(`\n錯誤：${err instanceof NetworkError ? err.message : '無法載入章節'}\n`))
@@ -194,7 +195,7 @@ async function runBrowse(): Promise<void> {
     }
 
     while (true) {
-      const action = await showChapter(chapterData, annotations)
+      const action = await showChapter(chapterData, annotations, { version })
       if (!action) break
       if (action.type !== 'annotate') continue
 
@@ -237,7 +238,7 @@ async function runBrowse(): Promise<void> {
   }
 }
 
-async function runSearch(): Promise<void> {
+async function runSearch(version: BibleVersion): Promise<void> {
   while (true) {
     clearScreen()
     showCursor()
@@ -259,7 +260,7 @@ async function runSearch(): Promise<void> {
     process.stdout.write(chalk.dim(`搜尋「${keyword}」中...\n`))
 
     try {
-      const res = await searchVerses(keyword)
+      const res = await searchVerses(keyword, version)
       await showSearchResults(keyword, res.count, res.verses)
     } catch (err) {
       process.stdout.write(chalk.red(`\n錯誤：${err instanceof NetworkError ? err.message : '搜尋失敗'}\n`))
@@ -286,7 +287,7 @@ async function doMarkComplete(planId: string, day: number): Promise<void> {
   await waitForKey()
 }
 
-async function runPlans(): Promise<void> {
+async function runPlans(version: BibleVersion): Promise<void> {
   if (!await ensureAuth()) return
 
   while (true) {
@@ -382,7 +383,7 @@ async function runPlans(): Promise<void> {
 
         let chapterData
         try {
-          const res = await fetchChapter(result.bookId, result.chapter)
+          const res = await fetchChapter(result.bookId, result.chapter, version)
           chapterData = res.chapter
         } catch (err) {
           process.stdout.write(chalk.red(`\n錯誤：${err instanceof NetworkError ? err.message : '無法載入章節'}\n`))
@@ -402,7 +403,7 @@ async function runPlans(): Promise<void> {
 
         // 章節閱讀迴圈
         while (true) {
-          const chAction = await showChapter(chapterData, chAnnotations, { showComplete: canComplete })
+          const chAction = await showChapter(chapterData, chAnnotations, { showComplete: canComplete, version })
 
           if (!chAction) break // 返回今日讀經
 
@@ -490,11 +491,13 @@ async function runAnnotations(): Promise<void> {
   }
 }
 
-const MENU_ITEMS = ['瀏覽書卷', '搜尋節次', '讀經計劃', '節次註記', '回上層'] as const
+const VERSION_LABELS: Record<BibleVersion, string> = { cuv: '和合本', kjv: 'KJV', esv: 'ESV' }
+const MENU_ITEMS = ['瀏覽書卷', '搜尋節次', '讀經計劃', '節次註記', '切換版本', '回上層'] as const
 const TOTAL = MENU_ITEMS.length
 
 export async function runBible(): Promise<void> {
   let selected = 0
+  let currentVersion: BibleVersion = 'cuv'
 
   const render = () => {
     clearScreen()
@@ -502,7 +505,8 @@ export async function runBible(): Promise<void> {
     process.stdout.write(chalk.bold('聖經閱讀\n\n'))
     MENU_ITEMS.forEach((label, i) => {
       if (i === TOTAL - 1) process.stdout.write(`    ──────────\n`)
-      process.stdout.write(i === selected ? chalk.cyan(`  ▶ ${label}\n`) : `    ${label}\n`)
+      const suffix = i === 4 ? chalk.dim(` [${VERSION_LABELS[currentVersion]}]`) : ''
+      process.stdout.write(i === selected ? chalk.cyan(`  ▶ ${label}`) + suffix + '\n' : `    ${label}${suffix}\n`)
     })
     process.stdout.write(chalk.dim('\n↑↓ 移動  Enter 選擇  q 返回\n'))
   }
@@ -517,11 +521,14 @@ export async function runBible(): Promise<void> {
     else if (key === 'down' || key === 'j') selected = (selected + 1) % TOTAL
     else if (key === 'enter') {
       showCursor()
-      if (selected === 0) await runBrowse()
-      else if (selected === 1) await runSearch()
-      else if (selected === 2) await runPlans()
+      if (selected === 0) await runBrowse(currentVersion)
+      else if (selected === 1) await runSearch(currentVersion)
+      else if (selected === 2) await runPlans(currentVersion)
       else if (selected === 3) await runAnnotations()
-      else break
+      else if (selected === 4) {
+        const v = await showVersionSelect(currentVersion)
+        if (v) currentVersion = v
+      } else break
       hideCursor()
     }
   }

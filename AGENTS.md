@@ -53,6 +53,14 @@ shao-cli-tools/
         index.ts              ← 好事選單
         client.ts             ← good-calendar API client
         views.ts              ← 列表、新增、個人資料畫面
+      bible/
+        index.ts              ← 聖經選單（版本切換、瀏覽、搜尋、計劃、註記）
+        client.ts             ← bible API client（支援 cuv/kjv/esv 版本參數）
+        views.ts              ← 書卷選擇、章節閱讀、搜尋結果、讀經計劃、節次註記
+      books/
+        index.ts              ← 書庫選單（搜尋、分頁瀏覽、內文閱讀）
+        client.ts             ← books API client（search、getBook、getContent）
+        views.ts              ← 搜尋結果列表、內文滾動閱讀器
   dist/                       ← tsc build 輸出（不納入版本控制）
   tests/
     unit/                     ← Vitest 單元測試（*.test.ts）
@@ -68,6 +76,8 @@ shao-cli-tools/
 2. `docs/API/`：後端 API 契約的最高依據（各功能獨立檔案）。
    - `docs/API/game-api.md`：遊戲服務 API
    - `docs/API/goodthing.md`：小小好事 API
+   - `docs/API/bible.md`：聖經閱讀 API
+   - `docs/API/books.md`：書庫 API
 
 `docs/sdd/idea.md` 只保留原始構想草稿，不具現行規範效力。
 
@@ -81,6 +91,8 @@ Base URL：`https://backend.instantcheeseshao.com`
 |------|---------|
 | 遊戲 | `/game_service` |
 | 小小好事 | `/good_calendar` |
+| 書庫 | `/books` |
+| 聖經閱讀 | `/bible` |
 
 `src/lib/api.ts` 統一處理：
 - 設定 `Content-Type: application/json`

@@ -1,7 +1,13 @@
 import chalk from 'chalk'
 import { clearScreen, hideCursor, registerRender } from '../../lib/screen.js'
 import { waitForKey } from '../../lib/input.js'
-import type { Book, BibleChapter, Annotation, Plan, UserPlan, SearchVerseResult, TodayReadingResponse } from './client.js'
+import type { Book, BibleChapter, Annotation, Plan, UserPlan, SearchVerseResult, TodayReadingResponse, BibleVersion } from './client.js'
+
+const VERSION_LABELS: Record<BibleVersion, string> = {
+  cuv: '和合本',
+  kjv: 'KJV',
+  esv: 'ESV',
+}
 
 export async function readLine(prompt: string, defaultValue?: string): Promise<string | null> {
   process.stdout.write(prompt)
@@ -54,7 +60,7 @@ export async function showBooks(books: Book[]): Promise<Book | null> {
     return 0
   }
 
-  const ps = 5
+  const ps = Math.max(10, (process.stdout.rows ?? 24) - 5)
 
   const render = () => {
     clearScreen()
@@ -138,7 +144,7 @@ export async function showChapterSelect(book: Book): Promise<number | null> {
 export async function showChapter(
   chapter: BibleChapter,
   annotations: Annotation[],
-  options: { showComplete?: boolean } = {}
+  options: { showComplete?: boolean; version?: BibleVersion } = {}
 ): Promise<{ type: 'annotate'; verse: number } | { type: 'complete' } | null> {
   const verses = chapter.verses
   const annotatedVerses = new Set(
@@ -147,10 +153,9 @@ export async function showChapter(
       .map(a => a.verse)
   )
 
-  const CONTENT_LINES = 5
   const VERSE_PREFIX = 8  // "▶ NNN ✎ "
   const textWidth = Math.max(10, (process.stdout.columns ?? 80) - VERSE_PREFIX)
-  const availLines = CONTENT_LINES
+  const availLines = 5
 
   function verseLineCount(text: string): number {
     return Math.max(1, Math.ceil(text.length / textWidth))
@@ -174,7 +179,8 @@ export async function showChapter(
   const render = () => {
     clearScreen()
     hideCursor()
-    process.stdout.write(chalk.bold(`${chapter.book_name} 第 ${chapter.chapter} 章\n\n`))
+    const versionLabel = options.version ? chalk.dim(` [${VERSION_LABELS[options.version]}]`) : ''
+    process.stdout.write(chalk.bold(`${chapter.book_name} 第 ${chapter.chapter} 章`) + versionLabel + '\n\n')
 
     let linesLeft = availLines
     for (let i = offset; i < verses.length && linesLeft > 0; i++) {
@@ -192,6 +198,9 @@ export async function showChapter(
       linesLeft -= vl
     }
 
+    if (chapter.copyright) {
+      process.stdout.write(chalk.dim(`\n${chapter.copyright}\n`))
+    }
     const completeHint = options.showComplete ? '  c 標記今日完成' : ''
     process.stdout.write(chalk.dim(`\nj/k 移動  a 新增註記${completeHint}  q 返回  (${cursor + 1}/${verses.length})\n`))
   }
@@ -234,7 +243,7 @@ export async function showSearchResults(
     }
   }
 
-  const resultsPerPage = 2
+  const resultsPerPage = Math.max(2, Math.floor(((process.stdout.rows ?? 24) - 4) / 3))
   let offset = 0
 
   const render = () => {
@@ -428,7 +437,7 @@ export async function showAnnotationList(
 
   const total = annotations.length
   let selected = 0
-  const ps = 2
+  const ps = Math.max(2, Math.floor(((process.stdout.rows ?? 24) - 4) / 4))
 
   const render = () => {
     clearScreen()
@@ -461,5 +470,31 @@ export async function showAnnotationList(
     if ((key === 'up' || key === 'k') && selected > 0) { selected--; render() }
     if ((key === 'down' || key === 'j') && selected < total - 1) { selected++; render() }
     if (key === 'd') return { type: 'delete', id: annotations[selected].id }
+  }
+}
+
+export async function showVersionSelect(current: BibleVersion): Promise<BibleVersion | null> {
+  const versions: BibleVersion[] = ['cuv', 'kjv', 'esv']
+  const labels = ['和合本 (CUV) — 繁體中文', '英王欽定本 (KJV)', '英文標準譯本 (ESV)']
+  let selected = versions.indexOf(current)
+
+  const render = () => {
+    clearScreen()
+    hideCursor()
+    process.stdout.write(chalk.bold('選擇聖經版本\n\n'))
+    versions.forEach((v, i) => {
+      process.stdout.write(i === selected ? chalk.cyan(`  ▶ ${labels[i]}\n`) : `    ${labels[i]}\n`)
+    })
+    process.stdout.write(chalk.dim('\n↑↓ 移動  Enter 選擇  q 取消\n'))
+  }
+  registerRender(render)
+  render()
+
+  while (true) {
+    const key = await waitForKey()
+    if (key === 'q' || key === 'ctrl+c' || key === 'escape') return null
+    if ((key === 'up' || key === 'k') && selected > 0) { selected--; render() }
+    if ((key === 'down' || key === 'j') && selected < versions.length - 1) { selected++; render() }
+    if (key === 'enter') return versions[selected]
   }
 }

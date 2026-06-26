@@ -1,5 +1,7 @@
 import { apiGet, apiPost, apiDelete, apiPatch } from '../../lib/api.js'
 
+export type BibleVersion = 'cuv' | 'kjv' | 'esv'
+
 export interface Book {
   id: string
   name: string
@@ -16,7 +18,9 @@ export interface BibleChapter {
   book_id: string
   book_name: string
   chapter: number
+  version: string
   verses: Verse[]
+  copyright?: string
 }
 
 export interface Plan {
@@ -64,7 +68,7 @@ export interface Annotation {
 }
 
 export interface SearchVerseResult {
-  book_id: string
+  book_id: string | null
   book_name: string
   chapter: number
   verse: number
@@ -72,15 +76,15 @@ export interface SearchVerseResult {
 }
 
 // Public
-export const fetchBooks = (): Promise<{ books: Book[] }> =>
-  apiGet<{ books: Book[] }>('/bible/books')
+export const fetchBooks = (version: BibleVersion = 'cuv'): Promise<{ books: Book[] }> =>
+  apiGet<{ books: Book[] }>(`/bible/books?version=${version}`)
 
-export const fetchChapter = (bookId: string, chapter: number): Promise<{ chapter: BibleChapter }> =>
-  apiGet<{ chapter: BibleChapter }>(`/bible/books/${bookId}/chapters/${chapter}`)
+export const fetchChapter = (bookId: string, chapter: number, version: BibleVersion = 'cuv'): Promise<{ chapter: BibleChapter }> =>
+  apiGet<{ chapter: BibleChapter }>(`/bible/books/${bookId}/chapters/${chapter}?version=${version}`)
 
-export const searchVerses = (q: string, limit = 20): Promise<{ keyword: string; count: number; verses: SearchVerseResult[] }> =>
+export const searchVerses = (q: string, version: BibleVersion = 'cuv', limit = 20): Promise<{ keyword: string; count: number; verses: SearchVerseResult[] }> =>
   apiGet<{ keyword: string; count: number; verses: SearchVerseResult[] }>(
-    `/bible/search?q=${encodeURIComponent(q)}&limit=${limit}`
+    `/bible/search?q=${encodeURIComponent(q)}&version=${version}&limit=${limit}`
   )
 
 export const fetchPlans = (): Promise<{ plans: Plan[] }> =>
