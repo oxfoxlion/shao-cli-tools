@@ -8,6 +8,7 @@ function parseKey(data: string): string | null {
   if (data === '\x7f' || data === '\x08') return 'backspace'
   if (data === ' ') return 'space'
   if (data === '\x03') return 'ctrl+c'
+  if (data === 'G') return 'G'
   if (data.length === 1 && data >= ' ') return data.toLowerCase()
   return null
 }

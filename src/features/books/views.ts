@@ -1,7 +1,8 @@
 import chalk from 'chalk'
 import { clearScreen, hideCursor, showCursor, registerRender } from '../../lib/screen.js'
 import { waitForKey } from '../../lib/input.js'
-import type { BookSummary } from './client.js'
+import type { GutendexBook } from './client.js'
+import { getTextUrl } from './client.js'
 
 export function readLine(prompt: string, defaultValue?: string): Promise<string | null> {
   process.stdout.write(prompt)
@@ -28,13 +29,17 @@ export function readLine(prompt: string, defaultValue?: string): Promise<string 
   })
 }
 
+function formatAuthor(authors: GutendexBook['authors']): string {
+  return authors.map(a => a.name.replace(/,\s*/, ' ')).join(', ')
+}
+
 export type SearchAction =
-  | { type: 'select'; book: BookSummary }
+  | { type: 'select'; book: GutendexBook }
   | { type: 'page'; direction: 1 | -1 }
   | null
 
 export async function showSearchResults(
-  results: BookSummary[],
+  results: GutendexBook[],
   count: number,
   page: number,
   hasNext: boolean,
@@ -54,34 +59,34 @@ export async function showSearchResults(
 
   const total = results.length
   let selected = 0
-  const ps = Math.max(3, (process.stdout.rows ?? 24) - 6)
+  const ps = Math.max(3, Math.floor(((process.stdout.rows ?? 24) - 5) / 2))
 
   const render = () => {
     clearScreen()
     hideCursor()
     const pageLabel = hasNext || page > 1 ? chalk.dim(` 第 ${page} 頁`) : ''
-    process.stdout.write(chalk.bold(`搜尋結果`) + pageLabel + chalk.dim(`（共 ${count} 筆）\n\n`))
+    process.stdout.write(chalk.bold('搜尋結果') + pageLabel + chalk.dim(`（共 ${count} 筆）\n\n`))
 
     const viewStart = Math.max(0, Math.min(selected - Math.floor(ps / 2), total - ps))
     const viewEnd = Math.min(total, viewStart + ps)
 
     for (let i = viewStart; i < viewEnd; i++) {
       const b = results[i]
-      const authors = b.authors.join(', ')
+      const author = formatAuthor(b.authors)
       const lang = chalk.dim(`[${b.languages.join(',')}]`)
-      const noText = b.hasText ? '' : chalk.dim(' (無文字版)')
+      const noText = getTextUrl(b.formats) === null ? chalk.dim(' (無文字版)') : ''
       if (i === selected) {
-        process.stdout.write(chalk.cyan(`  ▶ ${b.title}`) + noText + `\n`)
-        process.stdout.write(chalk.dim(`    ${authors} ${lang}\n\n`))
+        process.stdout.write(chalk.cyan(`  ▶ ${b.title}`) + noText + '\n')
+        process.stdout.write(chalk.dim(`    ${author} ${lang}\n\n`))
       } else {
-        process.stdout.write(`    ${b.title}` + noText + `\n`)
-        process.stdout.write(chalk.dim(`    ${authors} ${lang}\n\n`))
+        process.stdout.write(`    ${b.title}` + noText + '\n')
+        process.stdout.write(chalk.dim(`    ${author} ${lang}\n\n`))
       }
     }
 
-    const hints: string[] = ['j/k ↑↓ 移動', 'Enter 選擇']
-    if (page > 1) hints.push('p 上一頁')
-    if (hasNext) hints.push('n 下一頁')
+    const hints = ['j/k 移動', 'Enter 選擇']
+    if (page > 1) hints.push('p 上頁')
+    if (hasNext) hints.push('n 下頁')
     hints.push('q 返回')
     process.stdout.write(chalk.dim(hints.join('  ') + '\n'))
   }
@@ -99,62 +104,38 @@ export async function showSearchResults(
   }
 }
 
-export async function showContent(
-  title: string,
-  lines: string[],
-  page: number,
-  totalPages: number,
-): Promise<'next' | 'quit'> {
-  let offset = 0
-  const windowSize = Math.max(5, (process.stdout.rows ?? 24) - 4)
-  const atLastPage = page >= totalPages
+export async function showBookDetail(book: GutendexBook): Promise<'read' | null> {
+  const textUrl = getTextUrl(book.formats)
+  const canRead = textUrl !== null
 
   const render = () => {
     clearScreen()
     hideCursor()
-    const pageLabel = chalk.dim(` 第 ${page} / ${totalPages} 頁`)
-    process.stdout.write(chalk.bold(title.length > 40 ? title.slice(0, 39) + '…' : title) + pageLabel + '\n\n')
-
-    const end = Math.min(offset + windowSize, lines.length)
-    for (let i = offset; i < end; i++) {
-      process.stdout.write(lines[i] + '\n')
+    const cols = process.stdout.columns ?? 80
+    process.stdout.write(chalk.bold(book.title) + '\n\n')
+    process.stdout.write(`作者：${formatAuthor(book.authors)}\n`)
+    process.stdout.write(`語言：${book.languages.join(', ')}\n`)
+    if (book.subjects.length > 0) {
+      const sub = book.subjects.slice(0, 3).join(' · ')
+      const more = book.subjects.length > 3 ? ` …等 ${book.subjects.length} 個` : ''
+      const preview = (sub + more).length > cols - 5 ? (sub + more).slice(0, cols - 8) + '…' : sub + more
+      process.stdout.write(`主題：${preview}\n`)
     }
+    process.stdout.write('\n')
 
-    const atEnd = offset + windowSize >= lines.length
-    const hints: string[] = ['j/k 滾動']
-    if (atEnd && !atLastPage) hints.push('n 下一頁')
-    if (atEnd && atLastPage) hints.push(chalk.green('全書完畢'))
-    hints.push('q 返回')
-    process.stdout.write(chalk.dim(`\n${hints.join('  ')}  (行 ${offset + 1}–${end}/${lines.length})\n`))
+    if (canRead) {
+      process.stdout.write(chalk.dim('Enter 開始閱讀  q 返回\n'))
+    } else {
+      process.stdout.write(chalk.yellow('此書無純文字版本\n\n'))
+      process.stdout.write(chalk.dim('q 返回\n'))
+    }
   }
   registerRender(render)
   render()
 
   while (true) {
     const key = await waitForKey()
-    if (key === 'q' || key === 'ctrl+c' || key === 'escape') return 'quit'
-
-    const atEnd = offset + windowSize >= lines.length
-
-    if ((key === 'down' || key === 'j') && !atEnd) { offset++; render(); continue }
-    if ((key === 'up' || key === 'k') && offset > 0) { offset--; render(); continue }
-
-    if (key === 'n' && atEnd && !atLastPage) return 'next'
-
-    // Space / PageDown: jump a full window
-    if (key === 'space') {
-      if (!atEnd) { offset = Math.min(offset + windowSize, lines.length - windowSize); render() }
-      else if (!atLastPage) return 'next'
-    }
+    if (key === 'q' || key === 'ctrl+c' || key === 'escape') return null
+    if (key === 'enter' && canRead) return 'read'
   }
-}
-
-export async function showNoText(title: string): Promise<void> {
-  clearScreen()
-  hideCursor()
-  process.stdout.write(chalk.bold(title) + '\n\n')
-  process.stdout.write(chalk.yellow('此書沒有可用的純文字版本\n\n'))
-  process.stdout.write(chalk.dim('按任意鍵返回...\n'))
-  registerRender(() => {})
-  await waitForKey()
 }

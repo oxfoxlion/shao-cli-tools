@@ -1,9 +1,16 @@
 import chalk from 'chalk'
 import { clearScreen, hideCursor, showCursor, registerRender } from '../../lib/screen.js'
 import { waitForKey } from '../../lib/input.js'
-import { NetworkError } from '../../lib/api.js'
-import { searchBooks, getContent } from './client.js'
-import { readLine, showSearchResults, showContent, showNoText } from './views.js'
+import { searchBooks, getBook, fetchLines, getTextUrl } from './client.js'
+import { readLine, showSearchResults, showBookDetail } from './views.js'
+import { runReader } from './reader.js'
+
+async function handleError(err: unknown): Promise<void> {
+  clearScreen()
+  process.stdout.write(chalk.red(`\n錯誤：${err instanceof Error ? err.message : '發生未預期錯誤'}\n`))
+  process.stdout.write(chalk.dim('按任意鍵返回...\n'))
+  await waitForKey()
+}
 
 async function runSearch(): Promise<void> {
   while (true) {
@@ -19,7 +26,7 @@ async function runSearch(): Promise<void> {
 
     let searchPage = 1
 
-    while (true) {
+    searchLoop: while (true) {
       clearScreen()
       process.stdout.write(chalk.dim(`搜尋「${keyword}」中...\n`))
 
@@ -27,54 +34,46 @@ async function runSearch(): Promise<void> {
       try {
         res = await searchBooks(keyword.trim(), undefined, searchPage)
       } catch (err) {
-        clearScreen()
-        process.stdout.write(chalk.red(`\n錯誤：${err instanceof NetworkError ? err.message : '搜尋失敗'}\n`))
-        process.stdout.write(chalk.dim('按任意鍵返回...\n'))
-        await waitForKey()
+        await handleError(err)
         break
       }
 
-      const action = await showSearchResults(res.results, res.count, searchPage, res.next)
+      const action = await showSearchResults(res.results, res.count, searchPage, res.next !== null)
 
       if (!action) break
+      if (action.type === 'page') { searchPage += action.direction; continue }
 
-      if (action.type === 'page') {
-        searchPage += action.direction
+      // action.type === 'select' — 取得書籍詳情
+      clearScreen()
+      process.stdout.write(chalk.dim('載入書籍資訊...\n'))
+
+      let book
+      try {
+        book = await getBook(action.book.id)
+      } catch (err) {
+        await handleError(err)
+        continue searchLoop
+      }
+
+      const decision = await showBookDetail(book)
+      if (!decision) continue
+
+      // 開始下載全文
+      const textUrl = getTextUrl(book.formats)!
+      clearScreen()
+      process.stdout.write(chalk.dim('下載書本全文中（可能需要數秒）...\n'))
+
+      let lines: string[]
+      try {
+        lines = await fetchLines(textUrl)
+      } catch (err) {
+        await handleError(err)
         continue
       }
 
-      // action.type === 'select'
-      const book = action.book
-
-      if (!book.hasText) {
-        await showNoText(book.title)
-        continue
-      }
-
-      // 閱讀流程
-      let contentPage = 1
-      while (true) {
-        clearScreen()
-        process.stdout.write(chalk.dim('載入內文...\n'))
-
-        let content
-        try {
-          content = await getContent(book.id, contentPage)
-        } catch (err) {
-          clearScreen()
-          process.stdout.write(chalk.red(`\n錯誤：${err instanceof NetworkError ? err.message : '無法載入內文'}\n`))
-          process.stdout.write(chalk.dim('按任意鍵返回...\n'))
-          await waitForKey()
-          break
-        }
-
-        const result = await showContent(book.title, content.lines, content.page, content.totalPages)
-
-        if (result === 'quit') break
-        if (result === 'next' && contentPage < content.totalPages) {
-          contentPage++
-        }
-      }
+      showCursor()
+      await runReader(book.title, lines)
+      hideCursor()
     }
   }
 }
