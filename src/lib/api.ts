@@ -1,4 +1,4 @@
-import { getGoodCalendarSession } from './session.js'
+import { getAppSession } from './session.js'
 
 export const BASE_URL = 'https://backend.instantcheeseshao.com'
 
@@ -21,9 +21,9 @@ async function apiFetch<T>(method: string, path: string, body?: unknown): Promis
     'Content-Type': 'application/json',
   }
 
-  const session = getGoodCalendarSession()
+  const session = getAppSession()
   if (session) {
-    headers['Cookie'] = `good_calendar_session=${session}`
+    headers['Cookie'] = `app_session=${session}`
   }
 
   let response: Response

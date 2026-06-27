@@ -6,13 +6,20 @@ const SESSION_DIR = join(homedir(), '.config', 'shao')
 const SESSION_FILE = join(SESSION_DIR, 'session.json')
 
 interface SessionData {
-  good_calendar_session?: string
+  app_session?: string
 }
 
 function readSession(): SessionData {
   try {
     if (!existsSync(SESSION_FILE)) return {}
-    return JSON.parse(readFileSync(SESSION_FILE, 'utf8')) as SessionData
+    const raw = JSON.parse(readFileSync(SESSION_FILE, 'utf8')) as Record<string, unknown>
+    // one-time migration from old key
+    if (raw['good_calendar_session'] && !raw['app_session']) {
+      raw['app_session'] = raw['good_calendar_session']
+      delete raw['good_calendar_session']
+      writeSession(raw as SessionData)
+    }
+    return raw as SessionData
   } catch {
     return {}
   }
@@ -23,18 +30,18 @@ function writeSession(data: SessionData): void {
   writeFileSync(SESSION_FILE, JSON.stringify(data, null, 2))
 }
 
-export function getGoodCalendarSession(): string | undefined {
-  return readSession().good_calendar_session
+export function getAppSession(): string | undefined {
+  return readSession().app_session
 }
 
-export function setGoodCalendarSession(token: string): void {
+export function setAppSession(token: string): void {
   const data = readSession()
-  data.good_calendar_session = token
+  data.app_session = token
   writeSession(data)
 }
 
-export function clearGoodCalendarSession(): void {
+export function clearAppSession(): void {
   const data = readSession()
-  delete data.good_calendar_session
+  delete data.app_session
   writeSession(data)
 }

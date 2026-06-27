@@ -110,7 +110,7 @@ Session 儲存路徑：`~/.config/shao/session.json`
 
 ```json
 {
-  "good_calendar_session": "<token>"
+  "app_session": "<token>"
 }
 ```
 

@@ -1,11 +1,18 @@
 import { BASE_URL, AuthError, NetworkError, apiGet, apiPost, apiPatch, apiDelete } from '../../lib/api.js'
-import { setGoodCalendarSession, clearGoodCalendarSession } from '../../lib/session.js'
+import { setAppSession, clearAppSession } from '../../lib/session.js'
 
-export interface User {
+export interface AuthUser {
   id: string
-  nickname: string
-  created_at: string
-  last_login_at: string | null
+  email: string | null
+  displayName: string | null
+  nickname: string | null
+  twoFactorEnabled: boolean
+  hasPassword: boolean
+  hasPin: boolean
+  googleLinked: boolean
+  discordLinked: boolean
+  createdAt: string
+  lastLoginAt: string | null
 }
 
 export interface Entry {
@@ -28,7 +35,6 @@ export interface StreakSummary {
 }
 
 export interface ProfileResponse {
-  user: User
   profile: {
     month: string
     total_entries: number
@@ -48,7 +54,10 @@ export interface CreateEntryBody {
   hide_from_global_feed?: boolean
 }
 
-async function authRequest(path: string, body: Record<string, string>): Promise<User> {
+// Re-export for compatibility with index.ts
+export type User = AuthUser
+
+async function authRequest(path: string, body: Record<string, string>): Promise<AuthUser> {
   let response: Response
   try {
     response = await fetch(`${BASE_URL}${path}`, {
@@ -65,26 +74,28 @@ async function authRequest(path: string, body: Record<string, string>): Promise<
 
   const setCookie = response.headers.get('set-cookie')
   if (setCookie) {
-    const match = setCookie.match(/good_calendar_session=([^;]+)/)
-    if (match) setGoodCalendarSession(match[1])
+    const match = setCookie.match(/app_session=([^;]+)/)
+    if (match) setAppSession(match[1])
   }
 
-  const data = await response.json() as { user: User }
+  const data = await response.json() as { user?: AuthUser; require2FA?: boolean }
+  if (data.require2FA) throw new NetworkError('此帳號已啟用兩步驟驗證，請改用網頁版登入')
+  if (!data.user) throw new NetworkError('登入回應格式錯誤')
   return data.user
 }
 
-export const fetchMe = (): Promise<{ user: User }> =>
-  apiGet<{ user: User }>('/good_calendar/auth/me')
+export const fetchMe = (): Promise<{ user: AuthUser }> =>
+  apiGet<{ user: AuthUser }>('/auth/me')
 
-export const login = (nickname: string, pin: string): Promise<User> =>
-  authRequest('/good_calendar/auth/login', { nickname, pin })
+export const login = (nickname: string, pin: string): Promise<AuthUser> =>
+  authRequest('/auth/login', { nickname, pin })
 
-export const register = (nickname: string, pin: string): Promise<User> =>
-  authRequest('/good_calendar/auth/register', { nickname, pin })
+export const register = (nickname: string, pin: string): Promise<AuthUser> =>
+  authRequest('/auth/register', { nickname, pin })
 
 export async function logout(): Promise<void> {
-  await apiPost('/good_calendar/auth/logout')
-  clearGoodCalendarSession()
+  await apiPost('/auth/logout')
+  clearAppSession()
 }
 
 export const fetchProfile = (month?: string): Promise<ProfileResponse> =>
