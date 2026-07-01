@@ -54,25 +54,14 @@ const FETCH_HEADERS = {
   'Accept': 'text/plain,text/html,*/*',
 }
 
-// aleph.pglaf.org uses chunked directory path: /2/7/0/2701/2701-0.txt
-function toAlephPath(id: string, filename: string): string {
-  const chunks = id.split('').slice(0, id.length - 1)
-  return [...chunks, id, filename].join('/')
-}
-
 function buildFetchCandidates(textUrl: string): string[] {
-  const match = textUrl.match(/\/files\/(\d+)\/([^/]+\.txt)$/)
-
+  const match = textUrl.match(/\/files\/(\d+)\//)
   const candidates: string[] = [textUrl]
 
   if (match) {
-    const [, id, filename] = match
-    const alephPath = toAlephPath(id, filename)
-    candidates.push(
-      `http://aleph.pglaf.org/${alephPath}`,
-      `https://www.gutenberg.org/cache/epub/${id}/pg${id}.txt`,
-      `http://mirror.csclub.uwaterloo.ca/gutenberg/${alephPath}`,
-    )
+    const id = match[1]
+    // Internet Archive mirrors Gutenberg with a completely different IP/CDN
+    candidates.push(`https://archive.org/download/pg${id}/pg${id}.txt`)
   }
 
   return candidates
