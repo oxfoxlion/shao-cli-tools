@@ -54,15 +54,29 @@ const FETCH_HEADERS = {
   'Accept': 'text/plain,text/html,*/*',
 }
 
+const GUTENBERG_MIRRORS = [
+  'www.gutenberg.org',
+  'gutenberg.pglaf.org',
+]
+
 export async function fetchLines(textUrl: string): Promise<string[]> {
-  let res: Response
-  try {
-    res = await fetch(textUrl, { headers: FETCH_HEADERS })
-  } catch (err) {
-    const cause = (err as NodeJS.ErrnoException).cause ?? err
-    throw new Error(`無法取得書本內容：${(cause as Error).message ?? (err as Error).message}`)
+  let lastErr: Error = new Error('unknown error')
+
+  for (const mirror of GUTENBERG_MIRRORS) {
+    const url = textUrl.replace('www.gutenberg.org', mirror)
+    try {
+      const res = await fetch(url, {
+        headers: FETCH_HEADERS,
+        signal: AbortSignal.timeout(10000),
+      })
+      if (!res.ok) throw new Error(`下載失敗：HTTP ${res.status}`)
+      const text = await res.text()
+      return text.split('\n')
+    } catch (err) {
+      lastErr = err as Error
+    }
   }
-  if (!res.ok) throw new Error(`下載失敗：HTTP ${res.status}`)
-  const text = await res.text()
-  return text.split('\n')
+
+  const cause = (lastErr as NodeJS.ErrnoException).cause ?? lastErr
+  throw new Error(`無法取得書本內容：${(cause as Error).message ?? lastErr.message}`)
 }
