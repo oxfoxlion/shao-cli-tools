@@ -49,12 +49,18 @@ export const searchBooks = (q: string, lang?: string, page = 1): Promise<SearchR
 export const getBook = (id: number): Promise<GutendexBook> =>
   gutendexFetch<GutendexBook>(`${GUTENDEX}/books/${id}`)
 
+const FETCH_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (compatible; shao-cli-tools/1.0)',
+  'Accept': 'text/plain,text/html,*/*',
+}
+
 export async function fetchLines(textUrl: string): Promise<string[]> {
   let res: Response
   try {
-    res = await fetch(textUrl)
+    res = await fetch(textUrl, { headers: FETCH_HEADERS })
   } catch (err) {
-    throw new Error(`無法取得書本內容：${(err as Error).message}`)
+    const cause = (err as NodeJS.ErrnoException).cause ?? err
+    throw new Error(`無法取得書本內容：${(cause as Error).message ?? (err as Error).message}`)
   }
   if (!res.ok) throw new Error(`下載失敗：HTTP ${res.status}`)
   const text = await res.text()
