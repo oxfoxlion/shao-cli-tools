@@ -54,29 +54,47 @@ const FETCH_HEADERS = {
   'Accept': 'text/plain,text/html,*/*',
 }
 
-const GUTENBERG_MIRRORS = [
-  'www.gutenberg.org',
-  'gutenberg.pglaf.org',
-]
+function buildFetchCandidates(textUrl: string): string[] {
+  const idMatch = textUrl.match(/\/files\/(\d+)\//)
+  const id = idMatch?.[1]
+
+  const candidates: string[] = [
+    textUrl,
+    textUrl.replace('https://www.gutenberg.org', 'http://gutenberg.pglaf.org'),
+    textUrl.replace('https://www.gutenberg.org', 'https://gutenberg.pglaf.org'),
+  ]
+
+  if (id) {
+    candidates.push(
+      `https://www.gutenberg.org/cache/epub/${id}/pg${id}.txt`,
+      `http://gutenberg.pglaf.org/cache/epub/${id}/pg${id}.txt`,
+    )
+  }
+
+  return candidates
+}
 
 export async function fetchLines(textUrl: string): Promise<string[]> {
+  const candidates = buildFetchCandidates(textUrl)
   let lastErr: Error = new Error('unknown error')
 
-  for (const mirror of GUTENBERG_MIRRORS) {
-    const url = textUrl.replace('www.gutenberg.org', mirror)
+  for (const url of candidates) {
     try {
       const res = await fetch(url, {
         headers: FETCH_HEADERS,
         signal: AbortSignal.timeout(10000),
       })
-      if (!res.ok) throw new Error(`下載失敗：HTTP ${res.status}`)
+      if (!res.ok) {
+        lastErr = new Error(`下載失敗：HTTP ${res.status}`)
+        continue
+      }
       const text = await res.text()
       return text.split('\n')
     } catch (err) {
-      lastErr = err as Error
+      const cause = (err as NodeJS.ErrnoException).cause ?? err
+      lastErr = new Error((cause as Error).message ?? (err as Error).message)
     }
   }
 
-  const cause = (lastErr as NodeJS.ErrnoException).cause ?? lastErr
-  throw new Error(`無法取得書本內容：${(cause as Error).message ?? lastErr.message}`)
+  throw new Error(`無法取得書本內容：${lastErr.message}`)
 }
